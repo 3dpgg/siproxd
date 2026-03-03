@@ -273,10 +273,10 @@ int  PLUGIN_PROCESS(int stage, sip_ticket_t *ticket){
                 (configuration.outbound_host == NULL) ||
                 (strcmp(configuration.outbound_host, ipstring) != 0) ) ) {
 
-               INFO("STUN: public IP has changed %s -> %s",
+               INFO("STUN: public IP has changed %s -> %s, port: %i",
                     (configuration.outbound_host) ?
                     configuration.outbound_host:"NULL" ,
-                    ipstring);
+                    ipstring, port);
 
                if (configuration.outbound_host == NULL) {
                   configuration.outbound_host=malloc(IPSTRING_SIZE);
@@ -287,6 +287,13 @@ int  PLUGIN_PROCESS(int stage, sip_ticket_t *ticket){
                }
                strncpy(configuration.outbound_host, ipstring, IPSTRING_SIZE);
                configuration.outbound_host[IPSTRING_SIZE-1]='\0';
+
+               /* This corresponds with a hack in src/register.c to pass the STUN-learned
+                * port number in, but only if outbound_proxy_host was not user-defined */
+               if (!configuration.outbound_proxy_host) {
+                  configuration.outbound_proxy_port = port;
+                  INFO("STUN: outbound_proxy_port %i", configuration.outbound_proxy_port);
+               }
             }
 
 }

@@ -468,6 +468,18 @@ int register_client(sip_ticket_t *ticket, int force_lcl_masq) {
             urlmap[i].masq_url->port=realloc(urlmap[i].masq_url->port, PORTSTRING_SIZE);
             snprintf(urlmap[i].masq_url->port, PORTSTRING_SIZE, "%i",
                     configuration.sip_listen_port);
+         } else if (!configuration.outbound_proxy_host &&
+               configuration.outbound_proxy_port) {
+            /* This is a hack: reuse outbound_proxy_port to write the STUN-learned
+             * port number. This is usable only for Full Cone NAT (Endpoint-
+             * Independent), Restricted Cone NAT (Address-Dependent), and
+             * Port Restricted Cone NAT (Address- and Port-Dependent), using
+             * the terms from RFC 4787 and RFC 5389. */
+            urlmap[i].masq_url->port=realloc(urlmap[i].masq_url->port, PORTSTRING_SIZE);
+            snprintf(urlmap[i].masq_url->port, PORTSTRING_SIZE, "%i",
+                    configuration.outbound_proxy_port);
+            DEBUGC(DBCLASS_REG,"Rewrote port from %i to %s", SIP_PORT,
+                    urlmap[i].masq_url->port);
          }
 
          /* A proxied REGISTER request does not yet mean that this is a 

@@ -230,8 +230,12 @@ int is_via_local (osip_via_t *via) {
       }
 
       /* check the extracted VIA against my own host addresses */
+      /* A STUN address is considered my own address */
       if ( (memcmp(&addr_myself, &addr_via, sizeof(addr_myself))==0) &&
-           (port == configuration.sip_listen_port) ) {
+           ((port == configuration.sip_listen_port) || (
+            !configuration.outbound_proxy_host &&
+               configuration.outbound_proxy_port &&
+               port == configuration.outbound_proxy_port))) {
          DEBUG("got address match [%s]", utils_inet_ntoa(addr_via));
          found=1;
 	 break;
@@ -633,8 +637,16 @@ int sip_add_myvia (sip_ticket_t *ticket, int interface) {
 
    myaddr=utils_inet_ntoa(addr);
    if (ticket->protocol == PROTO_UDP) {
+      int port = configuration.sip_listen_port;
+      /* My VIA will use the STUN-learned port whenever the STUN-learned
+       * address is available and matched */
+      if (!configuration.outbound_proxy_host &&
+            configuration.outbound_proxy_port &&
+            strcmp(myaddr, configuration.outbound_host) == 0) {
+         port = configuration.outbound_proxy_port;
+      }
       snprintf(tmp, URL_STRING_SIZE, "SIP/2.0/UDP %s:%i;branch=%s%s",
-              myaddr, configuration.sip_listen_port,
+              myaddr, port,
               branch_id,
               (add_rport)? ";rport":"");
    } else {
@@ -715,9 +727,10 @@ int sip_rewrite_contact (sip_ticket_t *ticket, int direction) {
       if (contact == NULL) break;
       if (contact->url == NULL) continue;
 
-      DEBUGC(DBCLASS_PROXY, "trying to rewriting Contact header %s@%s",
+      DEBUGC(DBCLASS_PROXY, "trying to rewriting Contact header %s@%s:%s",
              (contact->url->username)? contact->url->username : "*NULL*",
-             (contact->url->host)? contact->url->host : "*NULL*");
+             (contact->url->host)? contact->url->host : "*NULL*",
+             (contact->url->port)? contact->url->port: "*NULL*");
 
       /* search for an entry */
       for (i=0;i<URLMAP_SIZE;i++){
@@ -733,14 +746,16 @@ int sip_rewrite_contact (sip_ticket_t *ticket, int direction) {
          char *tmp;
 
          if (direction == DIR_OUTGOING) {
-            DEBUGC(DBCLASS_PROXY, "rewriting Contact header %s@%s -> %s@%s",
+            DEBUGC(DBCLASS_PROXY, "rewriting Contact header %s@%s:%s -> %s@%s",
                    (contact->url->username)? contact->url->username : "*NULL*",
                    (contact->url->host)? contact->url->host : "*NULL*",
+                   (contact->url->port)? contact->url->port: "*NULL*",
                    urlmap[i].masq_url->username, urlmap[i].masq_url->host);
          } else {
-            DEBUGC(DBCLASS_PROXY, "rewriting Contact header %s@%s -> %s@%s",
+            DEBUGC(DBCLASS_PROXY, "rewriting Contact header %s@%s:%s -> %s@%s",
                    (contact->url->username)? contact->url->username : "*NULL*",
                    (contact->url->host)? contact->url->host : "*NULL*",
+                   (contact->url->port)? contact->url->port: "*NULL*",
                    urlmap[i].true_url->username, urlmap[i].true_url->host);
          }
 
