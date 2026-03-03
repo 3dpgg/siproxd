@@ -180,7 +180,7 @@ int  PLUGIN_PROCESS(int stage, sip_ticket_t *ticket){
 { /* clean up & move to function! */
             int i, j;
             int len=ticket->raw_buffer_len;
-            char *buffer=ticket->raw_buffer;
+            uint8_t *buffer=(uint8_t *)ticket->raw_buffer;
             int iptype;
             uint16_t port;
             unsigned char ip[4];
@@ -190,8 +190,8 @@ int  PLUGIN_PROCESS(int stage, sip_ticket_t *ticket){
             i=20;		// 1st attribute position
 
             while (i+4 <= len) {
-               int attr_typ = ntohs(*((int *)&buffer[i]) & 0x0000ffff);
-               int attr_len = ntohs(*((int *)&buffer[i+2]) & 0x0000ffff);
+               int attr_typ = (buffer[i  ] << 8) | buffer[i+1];
+               int attr_len = (buffer[i+2] << 8) | buffer[i+3];
 
                DEBUGC(DBCLASS_BABBLE,"STUN response: i=%i, type=%i, len=%i",
                       i, attr_typ, attr_len);
@@ -209,14 +209,14 @@ int  PLUGIN_PROCESS(int stage, sip_ticket_t *ticket){
                   /* 0x0001 Mapped Address */
                   case 0x0001:
                      DEBUGC(DBCLASS_BABBLE,"Mapped Addr, len=%i", attr_len);
-                     iptype=*((int*)&buffer[i+1]) & 0x000000ff;
+                     iptype=buffer[i+1];
                      if (iptype != 0x0001) {
                         DEBUGC(DBCLASS_BABBLE,
                                "Mapped Addr, wrong proto family [%i]", iptype);
                         break;
                      }
 
-                     port=htons(*((int*)&buffer[i+2]) & 0x0000ffff);
+                     port=(buffer[i+2] << 8) | buffer[i+3];
                      memcpy(ip,&buffer[i+4], 4);
 
                      DEBUGC(DBCLASS_BABBLE,"STUN: public IP %u.%u.%u.%u:%i",
@@ -233,7 +233,7 @@ int  PLUGIN_PROCESS(int stage, sip_ticket_t *ticket){
                   /* 0x8020 XOR Mapped Address */
                   case 0x8020:
                      DEBUGC(DBCLASS_BABBLE,"XOR Mapped Addr, len=%i", attr_len);
-                     iptype=*((int*)&buffer[i+1]) & 0x000000ff;
+                     iptype=buffer[i+1];
 
                      if (iptype != 0x0001) {
                         DEBUGC(DBCLASS_BABBLE,
@@ -241,7 +241,7 @@ int  PLUGIN_PROCESS(int stage, sip_ticket_t *ticket){
                         break;
                      }
 
-                     port=*((int*)&buffer[i+2]) & 0x0000ffff;
+                     port=(buffer[i+2] << 8) | buffer[i+3];
                      /* XOR the port with start of TID */
 //                     port = port ^ *((short int*)stun_transaction_id);
                      port = port ^ u.port;
@@ -344,7 +344,7 @@ static int stun_validate_response(char *buffer, int len, char *tid){
       return STS_FAILURE;
    }
 
-   if (ntohs(*((int*)&buffer[0]) & 0x0000ffff) != 0x0101) {
+   if (buffer[0] != 0x01 || buffer[1] != 0x01) {
       DEBUGC(DBCLASS_BABBLE,"stun_validate_response: no STUN response (type)");
       return STS_FAILURE;
    }
